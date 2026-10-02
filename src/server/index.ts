@@ -1,3 +1,5 @@
+import amqp from "amqplib";
+
 async function main() {
   console.log("Starting Peril server...");
 }
