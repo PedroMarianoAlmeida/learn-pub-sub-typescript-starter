@@ -1,6 +1,12 @@
 import amqp from "amqplib";
 import type { PlayingState } from "../internal/gamelogic/gamestate.js";
+import { type GameLog, writeLog } from "../internal/gamelogic/logs.js";
 import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
+import {
+  AckType,
+  SimpleQueueType,
+  subscribeMsgPack,
+} from "../internal/pubsub/consume.js";
 import { publishJSON } from "../internal/pubsub/publish.js";
 import {
   ExchangePerilDirect,
@@ -15,8 +21,20 @@ async function main() {
   const ch = await conn.createConfirmChannel();
   await ch.assertExchange(ExchangePerilDirect, "direct", { durable: true });
   await ch.assertExchange(ExchangePerilTopic, "topic", { durable: true });
-  const gameLogsQueue = await ch.assertQueue(GameLogSlug, { durable: true });
-  await ch.bindQueue(gameLogsQueue.queue, ExchangePerilTopic, `${GameLogSlug}.*`);
+  await subscribeMsgPack<GameLog>(
+    conn,
+    ExchangePerilTopic,
+    GameLogSlug,
+    `${GameLogSlug}.*`,
+    SimpleQueueType.Durable,
+    async (gameLog) => {
+      await writeLog(gameLog);
+      process.stdout.write("> ");
+      return AckType.Ack;
+    },
+    "topic",
+    {},
+  );
 
   printServerHelp();
 

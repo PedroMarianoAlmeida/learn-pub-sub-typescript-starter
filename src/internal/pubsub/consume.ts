@@ -1,4 +1,6 @@
-import amqp from "amqplib"; import type { Channel } from "amqplib";
+import amqp from "amqplib";
+import type { Channel } from "amqplib";
+import { decode } from "@msgpack/msgpack";
 
 export enum SimpleQueueType {
   Durable,
@@ -18,6 +20,9 @@ export async function declareAndBind(
   key: string,
   queueType: SimpleQueueType,
   exchangeType: "direct" | "topic" = "direct",
+  queueArguments: Record<string, unknown> = {
+    "x-dead-letter-exchange": "peril_dlx",
+  },
 ): Promise<[Channel, amqp.Replies.AssertQueue]> {
   const ch = await conn.createChannel();
   await ch.assertExchange(exchange, exchangeType, { durable: true });
@@ -26,9 +31,7 @@ export async function declareAndBind(
     durable: queueType === SimpleQueueType.Durable,
     autoDelete: isTransient,
     exclusive: isTransient,
-    arguments: {
-      "x-dead-letter-exchange": "peril_dlx",
-    },
+    arguments: queueArguments,
   });
 
   await ch.bindQueue(queue.queue, exchange, key);
@@ -36,14 +39,16 @@ export async function declareAndBind(
   return [ch, queue];
 }
 
-export async function subscribeJSON<T>(
+export async function subscribe<T>(
   conn: amqp.ChannelModel,
   exchange: string,
   queueName: string,
   key: string,
   queueType: SimpleQueueType,
   handler: (data: T) => Promise<AckType> | AckType,
+  deserializer: (data: Buffer) => T,
   exchangeType: "direct" | "topic" = "direct",
+  queueArguments?: Record<string, unknown>,
 ): Promise<void> {
   const [ch, queue] = await declareAndBind(
     conn,
@@ -52,6 +57,7 @@ export async function subscribeJSON<T>(
     key,
     queueType,
     exchangeType,
+    queueArguments,
   );
 
   await ch.consume(queue.queue, async (msg: amqp.ConsumeMessage | null) => {
@@ -59,7 +65,7 @@ export async function subscribeJSON<T>(
       return;
     }
 
-    const data = JSON.parse(msg.content.toString()) as T;
+    const data = deserializer(msg.content);
     switch (await handler(data)) {
       case AckType.Ack:
         console.log("Acking message");
@@ -75,4 +81,50 @@ export async function subscribeJSON<T>(
         break;
     }
   });
+}
+
+export function subscribeJSON<T>(
+  conn: amqp.ChannelModel,
+  exchange: string,
+  queueName: string,
+  key: string,
+  queueType: SimpleQueueType,
+  handler: (data: T) => Promise<AckType> | AckType,
+  exchangeType: "direct" | "topic" = "direct",
+  queueArguments?: Record<string, unknown>,
+): Promise<void> {
+  return subscribe(
+    conn,
+    exchange,
+    queueName,
+    key,
+    queueType,
+    handler,
+    (data) => JSON.parse(data.toString()) as T,
+    exchangeType,
+    queueArguments,
+  );
+}
+
+export function subscribeMsgPack<T>(
+  conn: amqp.ChannelModel,
+  exchange: string,
+  queueName: string,
+  key: string,
+  queueType: SimpleQueueType,
+  handler: (data: T) => Promise<AckType> | AckType,
+  exchangeType: "direct" | "topic" = "direct",
+  queueArguments?: Record<string, unknown>,
+): Promise<void> {
+  return subscribe(
+    conn,
+    exchange,
+    queueName,
+    key,
+    queueType,
+    handler,
+    (data) => decode(data) as T,
+    exchangeType,
+    queueArguments,
+  );
 }
