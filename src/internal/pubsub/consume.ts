@@ -11,9 +11,10 @@ export async function declareAndBind(
   queueName: string,
   key: string,
   queueType: SimpleQueueType,
+  exchangeType: "direct" | "topic" = "direct",
 ): Promise<[Channel, amqp.Replies.AssertQueue]> {
   const ch = await conn.createChannel();
-  await ch.assertExchange(exchange, "direct", { durable: true });
+  await ch.assertExchange(exchange, exchangeType, { durable: true });
   const isTransient = queueType === SimpleQueueType.Transient;
   const queue = await ch.assertQueue(queueName, {
     durable: queueType === SimpleQueueType.Durable,
@@ -33,6 +34,7 @@ export async function subscribeJSON<T>(
   key: string,
   queueType: SimpleQueueType,
   handler: (data: T) => void,
+  exchangeType: "direct" | "topic" = "direct",
 ): Promise<void> {
   const [ch, queue] = await declareAndBind(
     conn,
@@ -40,6 +42,7 @@ export async function subscribeJSON<T>(
     queueName,
     key,
     queueType,
+    exchangeType,
   );
 
   await ch.consume(queue.queue, (msg: amqp.ConsumeMessage | null) => {
