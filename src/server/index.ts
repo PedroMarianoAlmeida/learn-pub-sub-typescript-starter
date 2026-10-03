@@ -2,13 +2,21 @@ import amqp from "amqplib";
 import type { PlayingState } from "../internal/gamelogic/gamestate.js";
 import { getInput, printServerHelp } from "../internal/gamelogic/gamelogic.js";
 import { publishJSON } from "../internal/pubsub/publish.js";
-import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import {
+  ExchangePerilDirect,
+  ExchangePerilTopic,
+  GameLogSlug,
+  PauseKey,
+} from "../internal/routing/routing.js";
 
 async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
   const conn = await amqp.connect(rabbitConnString);
   const ch = await conn.createConfirmChannel();
   await ch.assertExchange(ExchangePerilDirect, "direct", { durable: true });
+  await ch.assertExchange(ExchangePerilTopic, "topic", { durable: true });
+  const gameLogsQueue = await ch.assertQueue(GameLogSlug, { durable: true });
+  await ch.bindQueue(gameLogsQueue.queue, ExchangePerilTopic, `${GameLogSlug}.*`);
 
   printServerHelp();
 
