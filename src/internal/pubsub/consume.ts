@@ -60,7 +60,7 @@ export async function subscribe<T>(
     queueArguments,
   );
 
-  await ch.prefetch(1);
+  await ch.prefetch(10);
 
   await ch.consume(queue.queue, async (msg: amqp.ConsumeMessage | null) => {
     if (msg === null) {
