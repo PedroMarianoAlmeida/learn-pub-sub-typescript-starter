@@ -4,6 +4,12 @@ export var SimpleQueueType;
     SimpleQueueType[SimpleQueueType["Durable"] = 0] = "Durable";
     SimpleQueueType[SimpleQueueType["Transient"] = 1] = "Transient";
 })(SimpleQueueType || (SimpleQueueType = {}));
+export var AckType;
+(function (AckType) {
+    AckType[AckType["Ack"] = 0] = "Ack";
+    AckType[AckType["NackRequeue"] = 1] = "NackRequeue";
+    AckType[AckType["NackDiscard"] = 2] = "NackDiscard";
+})(AckType || (AckType = {}));
 export async function declareAndBind(conn, exchange, queueName, key, queueType, exchangeType = "direct") {
     const ch = await conn.createChannel();
     await ch.assertExchange(exchange, exchangeType, { durable: true });
@@ -23,7 +29,19 @@ export async function subscribeJSON(conn, exchange, queueName, key, queueType, h
             return;
         }
         const data = JSON.parse(msg.content.toString());
-        handler(data);
-        ch.ack(msg);
+        switch (handler(data)) {
+            case AckType.Ack:
+                console.log("Acking message");
+                ch.ack(msg);
+                break;
+            case AckType.NackRequeue:
+                console.log("Nacking message and requeuing it");
+                ch.nack(msg, false, true);
+                break;
+            case AckType.NackDiscard:
+                console.log("Nacking message and discarding it");
+                ch.nack(msg, false, false);
+                break;
+        }
     });
 }
