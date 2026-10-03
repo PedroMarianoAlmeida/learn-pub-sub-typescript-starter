@@ -16,3 +16,14 @@ export async function declareAndBind(conn, exchange, queueName, key, queueType) 
     await ch.bindQueue(queue.queue, exchange, key);
     return [ch, queue];
 }
+export async function subscribeJSON(conn, exchange, queueName, key, queueType, handler) {
+    const [ch, queue] = await declareAndBind(conn, exchange, queueName, key, queueType);
+    await ch.consume(queue.queue, (msg) => {
+        if (msg === null) {
+            return;
+        }
+        const data = JSON.parse(msg.content.toString());
+        handler(data);
+        ch.ack(msg);
+    });
+}

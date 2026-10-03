@@ -6,15 +6,15 @@ import {
   printClientHelp,
   printQuit,
 } from "../internal/gamelogic/gamelogic.js";
-import { GameState, type PlayingState } from "../internal/gamelogic/gamestate.js";
+import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandMove } from "../internal/gamelogic/move.js";
-import { handlePause } from "../internal/gamelogic/pause.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import {
-  declareAndBind,
+  subscribeJSON,
   SimpleQueueType,
 } from "../internal/pubsub/consume.js";
 import { ExchangePerilDirect, PauseKey } from "../internal/routing/routing.js";
+import { handlerPause } from "./handlers.js";
 
 async function main() {
   console.log("Starting Peril client...");
@@ -22,24 +22,16 @@ async function main() {
   const conn = await amqp.connect(rabbitConnString);
   const username = await clientWelcome();
 
-  const [ch, queue] = await declareAndBind(
+  const gameState = new GameState(username);
+
+  await subscribeJSON(
     conn,
     ExchangePerilDirect,
     `${PauseKey}.${username}`,
     PauseKey,
     SimpleQueueType.Transient,
+    handlerPause(gameState),
   );
-  const gameState = new GameState(username);
-
-  await ch.consume(queue.queue, (msg) => {
-    if (msg === null) {
-      return;
-    }
-
-    const state = JSON.parse(msg.content.toString()) as PlayingState;
-    handlePause(gameState, state);
-    ch.ack(msg);
-  });
 
   clientLoop: while (true) {
     const words = await getInput();
