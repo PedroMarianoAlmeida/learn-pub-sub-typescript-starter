@@ -1,4 +1,5 @@
 import readline from "readline";
+import { GameState } from "./gamestate.js";
 const rl = readline.createInterface({
     input: process.stdin,
     output: process.stdout,
@@ -58,8 +59,7 @@ export function getInput(prompt = "> ") {
     return new Promise((resolve) => {
         rl.question(prompt, (answer) => {
             const trimmed = answer.trim();
-            const words = trimmed.split(/\s+/);
-            resolve(words);
+            resolve(trimmed === "" ? [] : trimmed.split(/\s+/));
         });
     });
 }

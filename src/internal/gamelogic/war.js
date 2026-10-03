@@ -1,3 +1,5 @@
+import { GameState } from "./gamestate.js";
+import {} from "./gamedata.js";
 import { getOverlappingLocation } from "./move.js";
 export var WarOutcome;
 (function (WarOutcome) {
@@ -6,7 +8,7 @@ export var WarOutcome;
     WarOutcome[WarOutcome["YouWon"] = 2] = "YouWon";
     WarOutcome[WarOutcome["OpponentWon"] = 3] = "OpponentWon";
     WarOutcome[WarOutcome["Draw"] = 4] = "Draw";
-})(WarOutcome = WarOutcome || (WarOutcome = {}));
+})(WarOutcome || (WarOutcome = {}));
 export function unitsToPowerLevel(units) {
     let power = 0;
     for (const unit of units) {

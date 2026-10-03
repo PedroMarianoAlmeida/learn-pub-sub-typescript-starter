@@ -1,10 +1,11 @@
 import { isValidLocation, } from "./gamedata.js";
+import { GameState } from "./gamestate.js";
 export var MoveOutcome;
 (function (MoveOutcome) {
     MoveOutcome[MoveOutcome["SamePlayer"] = 0] = "SamePlayer";
     MoveOutcome[MoveOutcome["Safe"] = 1] = "Safe";
     MoveOutcome[MoveOutcome["MakeWar"] = 2] = "MakeWar";
-})(MoveOutcome = MoveOutcome || (MoveOutcome = {}));
+})(MoveOutcome || (MoveOutcome = {}));
 export function getOverlappingLocation(p1, p2) {
     for (const u1 of Object.values(p1.units)) {
         for (const u2 of Object.values(p2.units)) {

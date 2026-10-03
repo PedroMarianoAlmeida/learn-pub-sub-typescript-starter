@@ -1,7 +1,15 @@
 import amqp from "amqplib";
-import { clientWelcome } from "../internal/gamelogic/gamelogic.js";
+import {
+  clientWelcome,
+  commandStatus,
+  getInput,
+  printClientHelp,
+  printQuit,
+} from "../internal/gamelogic/gamelogic.js";
 import { GameState, type PlayingState } from "../internal/gamelogic/gamestate.js";
+import { commandMove } from "../internal/gamelogic/move.js";
 import { handlePause } from "../internal/gamelogic/pause.js";
+import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import {
   declareAndBind,
   SimpleQueueType,
@@ -13,7 +21,6 @@ async function main() {
   const rabbitConnString = "amqp://guest:guest@localhost:5672/";
   const conn = await amqp.connect(rabbitConnString);
   const username = await clientWelcome();
-  const gameState = new GameState(username);
 
   const [ch, queue] = await declareAndBind(
     conn,
@@ -22,6 +29,7 @@ async function main() {
     PauseKey,
     SimpleQueueType.Transient,
   );
+  const gameState = new GameState(username);
 
   await ch.consume(queue.queue, (msg) => {
     if (msg === null) {
@@ -33,9 +41,43 @@ async function main() {
     ch.ack(msg);
   });
 
-  await new Promise<void>((resolve) => {
-    process.once("SIGINT", resolve);
-  });
+  clientLoop: while (true) {
+    const words = await getInput();
+    if (words.length === 0) {
+      continue;
+    }
+
+    switch (words[0]) {
+      case "spawn":
+        try {
+          commandSpawn(gameState, words);
+        } catch (err) {
+          console.log((err as Error).message);
+        }
+        break;
+      case "move":
+        try {
+          commandMove(gameState, words);
+        } catch (err) {
+          console.log((err as Error).message);
+        }
+        break;
+      case "status":
+        await commandStatus(gameState);
+        break;
+      case "help":
+        printClientHelp();
+        break;
+      case "spam":
+        console.log("Spamming not allowed yet!");
+        break;
+      case "quit":
+        printQuit();
+        break clientLoop;
+      default:
+        console.log("I don't understand that command.");
+    }
+  }
 
   await conn.close();
 }
