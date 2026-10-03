@@ -1,5 +1,5 @@
 import amqp from "amqplib";
-import { clientWelcome, commandStatus, getInput, printClientHelp, printQuit, } from "../internal/gamelogic/gamelogic.js";
+import { clientWelcome, commandStatus, getInput, getMaliciousLog, printClientHelp, printQuit, } from "../internal/gamelogic/gamelogic.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandMove } from "../internal/gamelogic/move.js";
 import { publishJSON, publishMsgPack } from "../internal/pubsub/publish.js";
@@ -56,7 +56,21 @@ async function main() {
                 printClientHelp();
                 break;
             case "spam":
-                console.log("Spamming not allowed yet!");
+                try {
+                    if (!words[1]) {
+                        throw new Error("usage: spam <count>");
+                    }
+                    const count = Number.parseInt(words[1], 10);
+                    if (Number.isNaN(count) || count < 0) {
+                        throw new Error("count must be a non-negative integer");
+                    }
+                    for (let i = 0; i < count; i += 1) {
+                        await publishGameLog(publisher, username, getMaliciousLog());
+                    }
+                }
+                catch (err) {
+                    console.log(err.message);
+                }
                 break;
             case "quit":
                 printQuit();

@@ -28,6 +28,7 @@ export async function declareAndBind(conn, exchange, queueName, key, queueType, 
 }
 export async function subscribe(conn, exchange, queueName, key, queueType, handler, deserializer, exchangeType = "direct", queueArguments) {
     const [ch, queue] = await declareAndBind(conn, exchange, queueName, key, queueType, exchangeType, queueArguments);
+    await ch.prefetch(1);
     await ch.consume(queue.queue, async (msg) => {
         if (msg === null) {
             return;
