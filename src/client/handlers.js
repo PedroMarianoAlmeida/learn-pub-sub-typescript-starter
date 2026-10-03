@@ -1,6 +1,9 @@
 import { handlePause } from "../internal/gamelogic/pause.js";
 import { handleMove, MoveOutcome } from "../internal/gamelogic/move.js";
+import { handleWar, WarOutcome } from "../internal/gamelogic/war.js";
 import { AckType } from "../internal/pubsub/consume.js";
+import { publishJSON } from "../internal/pubsub/publish.js";
+import { ExchangePerilTopic, WarRecognitionsPrefix, } from "../internal/routing/routing.js";
 export function handlerPause(gs) {
     return (ps) => {
         handlePause(gs, ps);
@@ -8,16 +11,44 @@ export function handlerPause(gs) {
         return AckType.Ack;
     };
 }
-export function handlerMove(gs) {
-    return (move) => {
+export function handlerMove(gs, publisher) {
+    return async (move) => {
         const outcome = handleMove(gs, move);
-        process.stdout.write("> ");
         switch (outcome) {
             case MoveOutcome.Safe:
-            case MoveOutcome.MakeWar:
+                process.stdout.write("> ");
                 return AckType.Ack;
+            case MoveOutcome.MakeWar: {
+                const rw = {
+                    attacker: move.player,
+                    defender: gs.getPlayerSnap(),
+                };
+                await publishJSON(publisher, ExchangePerilTopic, `${WarRecognitionsPrefix}.${rw.defender.username}`, rw);
+                process.stdout.write("> ");
+                return AckType.NackRequeue;
+            }
             case MoveOutcome.SamePlayer:
             default:
+                process.stdout.write("> ");
+                return AckType.NackDiscard;
+        }
+    };
+}
+export function handlerWar(gs) {
+    return async (rw) => {
+        const outcome = handleWar(gs, rw);
+        process.stdout.write("> ");
+        switch (outcome.result) {
+            case WarOutcome.NotInvolved:
+                return AckType.NackRequeue;
+            case WarOutcome.NoUnits:
+                return AckType.NackDiscard;
+            case WarOutcome.OpponentWon:
+            case WarOutcome.YouWon:
+            case WarOutcome.Draw:
+                return AckType.Ack;
+            default:
+                console.error("Unexpected war outcome:", outcome);
                 return AckType.NackDiscard;
         }
     };
