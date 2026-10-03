@@ -68,8 +68,7 @@ export function getInput(prompt: string = "> "): Promise<string[]> {
   return new Promise((resolve) => {
     rl.question(prompt, (answer) => {
       const trimmed = answer.trim();
-      const words = trimmed.split(/\s+/);
-      resolve(words);
+      resolve(trimmed === "" ? [] : trimmed.split(/\s+/));
     });
   });
 }
