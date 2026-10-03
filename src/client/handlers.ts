@@ -38,14 +38,19 @@ export function handlerMove(
           attacker: move.player,
           defender: gs.getPlayerSnap(),
         };
-        await publishJSON(
-          publisher,
-          ExchangePerilTopic,
-          `${WarRecognitionsPrefix}.${rw.defender.username}`,
-          rw,
-        );
-        process.stdout.write("> ");
-        return AckType.NackRequeue;
+        try {
+          await publishJSON(
+            publisher,
+            ExchangePerilTopic,
+            `${WarRecognitionsPrefix}.${rw.defender.username}`,
+            rw,
+          );
+          return AckType.Ack;
+        } catch {
+          return AckType.NackRequeue;
+        } finally {
+          process.stdout.write("> ");
+        }
       }
       case MoveOutcome.SamePlayer:
       default:
