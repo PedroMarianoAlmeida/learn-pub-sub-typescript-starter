@@ -2,11 +2,19 @@ import amqp from "amqplib";
 import { clientWelcome, commandStatus, getInput, printClientHelp, printQuit, } from "../internal/gamelogic/gamelogic.js";
 import { GameState } from "../internal/gamelogic/gamestate.js";
 import { commandMove } from "../internal/gamelogic/move.js";
-import { publishJSON } from "../internal/pubsub/publish.js";
+import { publishJSON, publishMsgPack } from "../internal/pubsub/publish.js";
 import { commandSpawn } from "../internal/gamelogic/spawn.js";
 import { subscribeJSON, SimpleQueueType, } from "../internal/pubsub/consume.js";
-import { ArmyMovesPrefix, ExchangePerilDirect, ExchangePerilTopic, PauseKey, WarRecognitionsPrefix, } from "../internal/routing/routing.js";
+import { ArmyMovesPrefix, ExchangePerilDirect, ExchangePerilTopic, GameLogSlug, PauseKey, WarRecognitionsPrefix, } from "../internal/routing/routing.js";
 import { handlerMove, handlerPause, handlerWar } from "./handlers.js";
+export function publishGameLog(ch, username, message) {
+    const gameLog = {
+        username,
+        message,
+        currentTime: new Date(),
+    };
+    return publishMsgPack(ch, ExchangePerilTopic, `${GameLogSlug}.${username}`, gameLog);
+}
 async function main() {
     console.log("Starting Peril client...");
     const rabbitConnString = "amqp://guest:guest@localhost:5672/";
@@ -15,7 +23,7 @@ async function main() {
     const gameState = new GameState(username);
     const publisher = await conn.createConfirmChannel();
     await subscribeJSON(conn, ExchangePerilTopic, `${ArmyMovesPrefix}.${username}`, `${ArmyMovesPrefix}.*`, SimpleQueueType.Transient, handlerMove(gameState, publisher), "topic");
-    await subscribeJSON(conn, ExchangePerilTopic, WarRecognitionsPrefix, `${WarRecognitionsPrefix}.*`, SimpleQueueType.Durable, handlerWar(gameState), "topic");
+    await subscribeJSON(conn, ExchangePerilTopic, `${WarRecognitionsPrefix}.${username}`, `${WarRecognitionsPrefix}.${username}`, SimpleQueueType.Durable, handlerWar(gameState, publisher, publishGameLog), "topic");
     await subscribeJSON(conn, ExchangePerilDirect, `${PauseKey}.${username}`, PauseKey, SimpleQueueType.Transient, handlerPause(gameState));
     clientLoop: while (true) {
         const words = await getInput();

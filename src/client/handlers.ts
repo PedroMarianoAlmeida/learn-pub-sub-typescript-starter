@@ -42,7 +42,7 @@ export function handlerMove(
           await publishJSON(
             publisher,
             ExchangePerilTopic,
-            `${WarRecognitionsPrefix}.${rw.defender.username}`,
+            `${WarRecognitionsPrefix}.${rw.attacker.username}`,
             rw,
           );
           return AckType.Ack;
@@ -62,6 +62,12 @@ export function handlerMove(
 
 export function handlerWar(
   gs: GameState,
+  publisher: ConfirmChannel,
+  publishGameLog: (
+    ch: ConfirmChannel,
+    username: string,
+    message: string,
+  ) => Promise<void>,
 ): (rw: RecognitionOfWar) => Promise<AckType> {
   return async (rw) => {
     const outcome = handleWar(gs, rw);
@@ -69,13 +75,32 @@ export function handlerWar(
 
     switch (outcome.result) {
       case WarOutcome.NotInvolved:
-        return AckType.NackRequeue;
+        return AckType.NackDiscard;
       case WarOutcome.NoUnits:
         return AckType.NackDiscard;
       case WarOutcome.OpponentWon:
       case WarOutcome.YouWon:
+        try {
+          await publishGameLog(
+            publisher,
+            rw.attacker.username,
+            `${outcome.winner} won a war against ${outcome.loser}`,
+          );
+          return AckType.Ack;
+        } catch {
+          return AckType.NackRequeue;
+        }
       case WarOutcome.Draw:
-        return AckType.Ack;
+        try {
+          await publishGameLog(
+            publisher,
+            rw.attacker.username,
+            `A war between ${outcome.attacker} and ${outcome.defender} resulted in a draw`,
+          );
+          return AckType.Ack;
+        } catch {
+          return AckType.NackRequeue;
+        }
       default:
         console.error("Unexpected war outcome:", outcome);
         return AckType.NackDiscard;
