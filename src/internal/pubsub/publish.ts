@@ -1,10 +1,27 @@
-import type {ConfirmChannel} from "amqplib"
+import type { ConfirmChannel } from "amqplib";
 
-function publishJSON<T>(
+export function publishJSON<T>(
   ch: ConfirmChannel,
   exchange: string,
   routingKey: string,
   value: T,
-): Promise<void>;
+): Promise<void> {
+  const content = Buffer.from(JSON.stringify(value));
 
-publishJSON("1", "2", "3", JSON.stringify({value: "Test"}))
+  return new Promise((resolve, reject) => {
+    ch.publish(
+      exchange,
+      routingKey,
+      content,
+      { contentType: "application/json" },
+      (err) => {
+        if (err) {
+          reject(err);
+          return;
+        }
+
+        resolve();
+      },
+    );
+  });
+}
